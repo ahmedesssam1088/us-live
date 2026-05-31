@@ -712,22 +712,94 @@ function updatePriceDisplay() {
 // ── Fetch fundamentals ───────────────────────────────────────────────────────
 async function fetchFundamentals() {
   try {
+    // Try server first
     const res = await fetch(`${API_BASE}/api/fundamentals/${TICKER}`);
-    fundData  = await res.json();
+    const d   = await res.json();
+    if (d && (d.pe || d.target || d.marketCap || d.high52)) {
+      fundData = d;
+      renderFundamentals();
+      updateSignal();
+      buildPrompt();
+      return;
+    }
+  } catch(e) {}
+
+  // Fallback: fetch directly from browser (bypasses server block)
+  try {
+    // v8 for 52W high/low
+    const r1   = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${TICKER}?interval=1d&range=1y`);
+    const j1   = await r1.json();
+    const meta = j1?.chart?.result?.[0]?.meta || {};
+
+    // v10 for PE, target, recommendation
+    const r2   = await fetch(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${TICKER}?modules=financialData,defaultKeyStatistics,summaryDetail`);
+    const j2   = await r2.json();
+    const res2 = j2?.quoteSummary?.result?.[0] || {};
+    const fd   = res2.financialData || {};
+    const ks   = res2.defaultKeyStatistics || {};
+    const sd   = res2.summaryDetail || {};
+
+    fundData = {
+      high52:         meta.fiftyTwoWeekHigh        || sd.fiftyTwoWeekHigh?.raw  || null,
+      low52:          meta.fiftyTwoWeekLow         || sd.fiftyTwoWeekLow?.raw   || null,
+      marketCap:      meta.marketCap               || ks.marketCap?.raw         || null,
+      pe:             sd.trailingPE?.raw           || ks.trailingPE?.raw        || null,
+      forwardPE:      sd.forwardPE?.raw            || ks.forwardPE?.raw         || null,
+      eps:            ks.trailingEps?.raw          || null,
+      beta:           ks.beta?.raw                 || null,
+      target:         fd.targetMeanPrice?.raw      || null,
+      targetHigh:     fd.targetHighPrice?.raw      || null,
+      targetLow:      fd.targetLowPrice?.raw       || null,
+      analystCount:   fd.numberOfAnalystOpinions?.raw || null,
+      recommendation: fd.recommendationKey         || null,
+      revenueGrowth:  fd.revenueGrowth?.raw        || null,
+      grossMargins:   fd.grossMargins?.raw         || null,
+    };
+
     renderFundamentals();
     updateSignal();
     buildPrompt();
-  } catch(e) { console.error('Fund error:', e); }
+  } catch(e) { console.error('Fund browser fallback error:', e); }
 }
 
 // ── Fetch earnings ───────────────────────────────────────────────────────────
 async function fetchEarnings() {
   try {
-    const res    = await fetch(`${API_BASE}/api/earnings/${TICKER}`);
-    earningsData = await res.json();
+    const res = await fetch(`${API_BASE}/api/earnings/${TICKER}`);
+    const d   = await res.json();
+    if (d?.nextEarningsDate) {
+      earningsData = d;
+      renderEarnings();
+      buildPrompt();
+      return;
+    }
+  } catch(e) {}
+
+  // Fallback: browser direct
+  try {
+    const url  = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${TICKER}?modules=calendarEvents,earningsTrend`;
+    const res  = await fetch(url);
+    const json = await res.json();
+    const result = json?.quoteSummary?.result?.[0] || {};
+    const cal    = result.calendarEvents || {};
+    const trend  = result.earningsTrend?.trend || [];
+    const raw    = cal.earnings?.earningsDate?.[0]?.raw;
+    const nextQ  = trend.find(t => t.period === "+1q") || trend[0] || {};
+
+    earningsData = {
+      nextEarningsDate: raw ? new Date(raw * 1000).toISOString().split("T")[0] : null,
+      epsEstimate:      nextQ.earningsEstimate?.avg?.raw || null,
+      revenueEstimate:  nextQ.revenueEstimate?.avg?.raw  || null,
+      epsTrend: {
+        current:  nextQ.earningsEstimate?.avg?.raw        || null,
+        "7dAgo":  nextQ.epsTrend?.["7daysAgo"]?.raw       || null,
+        "30dAgo": nextQ.epsTrend?.["30daysAgo"]?.raw      || null,
+        "90dAgo": nextQ.epsTrend?.["90daysAgo"]?.raw      || null,
+      }
+    };
     renderEarnings();
     buildPrompt();
-  } catch(e) { console.error('Earnings error:', e); }
+  } catch(e) { console.error('Earnings browser fallback error:', e); }
 }
 
 // ── Fetch options ────────────────────────────────────────────────────────────
