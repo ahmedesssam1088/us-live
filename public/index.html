@@ -1017,8 +1017,31 @@ async function fetchPrices() {
 async function fetchFundamentals(ticker) {
   if (funds[ticker]) return;
   try {
-    const res  = await fetch(`${API_BASE}/api/fundamentals/${ticker}`);
-    funds[ticker] = await res.json();
+    // Try server first (cached)
+    const res = await fetch(`${API_BASE}/api/fundamentals/${ticker}`);
+    const d   = await res.json();
+    // If server returned real data (not blocked), use it
+    if (d && (d.pe || d.target || d.marketCap || d.high52)) {
+      funds[ticker] = d;
+      return;
+    }
+  } catch(e) {}
+
+  // Fallback: fetch directly from Yahoo Finance via browser (no CORS block)
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
+    const res = await fetch(url);
+    const json = await res.json();
+    const meta = json?.chart?.result?.[0]?.meta || {};
+    funds[ticker] = {
+      high52:     meta.fiftyTwoWeekHigh || null,
+      low52:      meta.fiftyTwoWeekLow  || null,
+      marketCap:  meta.marketCap        || null,
+      price:      meta.regularMarketPrice || null,
+      target:     null,
+      pe:         null,
+      recommendation: null,
+    };
   } catch(e) {}
 }
 
@@ -1048,16 +1071,31 @@ async function fetchEarningsAll() {
   const results = [];
   for (const ticker of POPULAR) {
     try {
-      const res  = await fetch(`${API_BASE}/api/earnings/${ticker}`);
-      const data = await res.json();
-      if (data.nextEarningsDate) {
+      // Try server first
+      let data = null;
+      const res = await fetch(`${API_BASE}/api/earnings/${ticker}`);
+      data = await res.json();
+
+      // If server blocked, fetch directly from browser
+      if (!data?.nextEarningsDate) {
+        const url  = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=calendarEvents`;
+        const res2 = await fetch(url);
+        const json = await res2.json();
+        const cal  = json?.quoteSummary?.result?.[0]?.calendarEvents || {};
+        const raw  = cal.earnings?.earningsDate?.[0]?.raw;
+        if (raw) {
+          data = { nextEarningsDate: new Date(raw * 1000).toISOString().split("T")[0], epsEstimate: null };
+        }
+      }
+
+      if (data?.nextEarningsDate) {
         const daysAway = Math.round((new Date(data.nextEarningsDate) - Date.now()) / 86400000);
         if (daysAway >= -1 && daysAway <= 60) {
           results.push({ ticker, ...data, daysAway });
         }
       }
     } catch(e) {}
-    await new Promise(r => setTimeout(r, 500)); // 500ms between each request
+    await new Promise(r => setTimeout(r, 200));
     if (results.length) {
       earnings = results.sort((a,b) => a.daysAway - b.daysAway);
       renderEarnings();
