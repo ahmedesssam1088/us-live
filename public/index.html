@@ -1031,6 +1031,41 @@ async function fetchEarnings() {
   } catch(e) {}
 }
 
+// Fetch earnings one by one for top stocks and render progressively
+const POPULAR = [
+  "AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","JPM","V","MA",
+  "JNJ","WMT","PG","KO","HD","BAC","XOM","CVX","LLY","ABBV",
+  "MRK","PEP","COST","NFLX","AMD","QCOM","GS","MS","UNH","TMO",
+  "ABT","DHR","NEE","AMGN","TXN","HON","CAT","DE","RTX","BA"
+];
+let earningsLoaded = false;
+
+async function fetchEarningsAll() {
+  if (earningsLoaded) return;
+  document.getElementById('earnings-view').innerHTML =
+    '<div class="empty-state"><div class="empty-icon">📅</div>Loading earnings for top stocks...</div>';
+
+  const results = [];
+  for (const ticker of POPULAR) {
+    try {
+      const res  = await fetch(`${API_BASE}/api/earnings/${ticker}`);
+      const data = await res.json();
+      if (data.nextEarningsDate) {
+        const daysAway = Math.round((new Date(data.nextEarningsDate) - Date.now()) / 86400000);
+        if (daysAway >= -1 && daysAway <= 60) {
+          results.push({ ticker, ...data, daysAway });
+        }
+      }
+    } catch(e) {}
+    // render after each fetch so user sees progress
+    if (results.length) {
+      earnings = results.sort((a,b) => a.daysAway - b.daysAway);
+      renderEarnings();
+    }
+  }
+  earningsLoaded = true;
+}
+
 // ── Ticker Tape ──────────────────────────────────────────────────────────────
 function updateTape() {
   const tickers = ALL_TICKERS.filter(t => prices[t]?.price).slice(0, 80);
@@ -1131,6 +1166,8 @@ function switchView(view, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderCurrentView();
+  if (view === 'opps') loadOpps();
+  if (view === 'earnings') fetchEarningsAll();
 }
 
 function renderCurrentView() {
@@ -1265,6 +1302,16 @@ function renderSectors() {
 }
 
 // ── Opportunities render ─────────────────────────────────────────────────────
+async function loadOpps() {
+  // Fetch fundamentals for all tickers that dont have them yet, in parallel batches
+  const missing = ALL_TICKERS.filter(t => !funds[t]);
+  for (let i = 0; i < missing.length; i += 10) {
+    const batch = missing.slice(i, i + 10);
+    await Promise.all(batch.map(t => fetchFundamentals(t)));
+    renderOpps(); // re-render after each batch
+  }
+}
+
 function renderOpps() {
   const el  = document.getElementById('opps-view');
   const top = ALL_TICKERS
@@ -1274,7 +1321,8 @@ function renderOpps() {
     .slice(0, 24);
 
   if (!top.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div>Loading data...</div>';
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div>Loading fundamentals data — this may take ~30 seconds on first load...</div>';
+    loadOpps();
     return;
   }
 
