@@ -239,9 +239,11 @@ async function fetchFundamentals(ticker) {
       targetHigh: fd.targetHighPrice?.raw || null,
       targetLow:  fd.targetLowPrice?.raw  || null,
       analystCount: fd.numberOfAnalystOpinions?.raw || null,
-      recommendation: fd.recommendationKey || null,  // "buy","hold","sell","strong_buy"
+      recommendation: fd.recommendationKey || null,
       revenueGrowth: fd.revenueGrowth?.raw || null,
       grossMargins:  fd.grossMargins?.raw  || null,
+      high52: sd.fiftyTwoWeekHigh?.raw || null,
+      low52:  sd.fiftyTwoWeekLow?.raw  || null,
       fetchedAt: now
     };
 
