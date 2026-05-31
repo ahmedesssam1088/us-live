@@ -213,26 +213,39 @@ async function fetchFundamentals(ticker) {
   }
 
   try {
-    // Yahoo Finance v8 quote endpoint (no API key needed)
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+    // Yahoo Finance v8 — gets price, 52W high/low, prevClose
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1y`;
     const res  = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     const json = await res.json();
     const meta = json?.chart?.result?.[0]?.meta || {};
 
     // Yahoo Finance v10 for detailed fundamentals
-    const url2 = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=defaultKeyStatistics,financialData,summaryDetail`;
+    const url2 = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=defaultKeyStatistics,financialData,summaryDetail,price`;
     const res2  = await fetch(url2, { headers: { "User-Agent": "Mozilla/5.0" } });
     const json2 = await res2.json();
     const result = json2?.quoteSummary?.result?.[0] || {};
     const ks = result.defaultKeyStatistics || {};
     const fd = result.financialData || {};
     const sd = result.summaryDetail || {};
+    const pr = result.price || {};
+
+    // 52W from multiple sources — use whichever responds
+    const high52 =
+      pr.fiftyTwoWeekHigh?.raw  ||
+      sd.fiftyTwoWeekHigh?.raw  ||
+      meta.fiftyTwoWeekHigh     ||
+      null;
+    const low52 =
+      pr.fiftyTwoWeekLow?.raw   ||
+      sd.fiftyTwoWeekLow?.raw   ||
+      meta.fiftyTwoWeekLow      ||
+      null;
 
     const data = {
       pe:        sd.trailingPE?.raw       || ks.trailingPE?.raw       || null,
       forwardPE: sd.forwardPE?.raw        || ks.forwardPE?.raw        || null,
       eps:       ks.trailingEps?.raw      || null,
-      marketCap: ks.marketCap?.raw        || null,
+      marketCap: ks.marketCap?.raw        || pr.marketCap?.raw        || null,
       marketCapFmt: ks.marketCap?.fmt     || null,
       beta:      ks.beta?.raw             || null,
       target:    fd.targetMeanPrice?.raw  || null,
@@ -242,8 +255,8 @@ async function fetchFundamentals(ticker) {
       recommendation: fd.recommendationKey || null,
       revenueGrowth: fd.revenueGrowth?.raw || null,
       grossMargins:  fd.grossMargins?.raw  || null,
-      high52: sd.fiftyTwoWeekHigh?.raw || null,
-      low52:  sd.fiftyTwoWeekLow?.raw  || null,
+      high52,
+      low52,
       fetchedAt: now
     };
 
