@@ -715,8 +715,8 @@ async function fetchFundamentals() {
     const res = await fetch(`${API_BASE}/api/fundamentals/${TICKER}`);
     fundData  = await res.json();
     renderFundamentals();
-    buildPrompt();
     updateSignal();
+    buildPrompt();
   } catch(e) { console.error('Fund error:', e); }
 }
 
@@ -1031,7 +1031,13 @@ function updateSignal() {
   const target = f.target  || 0;
   const rec    = f.recommendation || 'hold';
 
-  if (!high52 || !low52) return;
+  if (!high52 || !low52) {
+    document.getElementById('signal-emoji').textContent = '⏳';
+    document.getElementById('signal-text').textContent  = 'Loading...';
+    document.getElementById('signal-text').style.color  = 'var(--muted)';
+    document.getElementById('signal-sub').textContent   = 'Waiting for 52W data';
+    return;
+  }
 
   const pct52  = (price - low52) / (high52 - low52);
   const upside = target > 0 ? (target - price) / price : 0;
@@ -1170,6 +1176,8 @@ async function init() {
   initHeader();
   initChart();
   await fetchPrice();
+  updateSignal();
+  buildPrompt();
   fetchFundamentals();
   fetchEarnings();
 
