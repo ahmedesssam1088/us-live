@@ -784,7 +784,7 @@ function calcIndicators(price, high52, low52) {
 
 function renderIndicators() {
   const p     = priceData;
-  const ind   = calcIndicators(p.price, p.high52, p.low52);
+  const ind   = calcIndicators(p.price, p.high52 || f.high52, p.low52 || f.low52);
   const el    = document.getElementById('indicators-grid');
   if (!ind) { el.innerHTML = '<div style="color:var(--muted)">Waiting for price data...</div>'; return; }
 
@@ -824,8 +824,8 @@ function renderIndicators() {
 function renderSR() {
   const p     = priceData;
   const price = p.price;
-  const H     = p.high52 || price * 1.15;
-  const L     = p.low52  || price * 0.85;
+  const H     = p.high52 || f.high52 || price * 1.15;
+  const L     = p.low52  || f.low52  || price * 0.85;
   const C     = p.prevClose || price;
   if (!price) return;
 
@@ -1026,8 +1026,8 @@ function updateSignal() {
   const price = p.price;
   if (!price) return;
 
-  const high52 = p.high52 || 0;
-  const low52  = p.low52  || 0;
+  const high52 = p.high52 || f.high52 || 0;
+  const low52  = p.low52  || f.low52  || 0;
   const target = f.target  || 0;
   const rec    = f.recommendation || 'hold';
 
