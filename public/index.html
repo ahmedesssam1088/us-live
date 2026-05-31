@@ -1057,7 +1057,7 @@ async function fetchEarningsAll() {
         }
       }
     } catch(e) {}
-    // render after each fetch so user sees progress
+    await new Promise(r => setTimeout(r, 500)); // 500ms between each request
     if (results.length) {
       earnings = results.sort((a,b) => a.daysAway - b.daysAway);
       renderEarnings();
@@ -1166,7 +1166,7 @@ function switchView(view, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderCurrentView();
-  if (view === 'opps') loadOpps();
+  if (view === 'opps' && !oppsLoading) loadOpps();
   if (view === 'earnings') fetchEarningsAll();
 }
 
@@ -1302,14 +1302,18 @@ function renderSectors() {
 }
 
 // ── Opportunities render ─────────────────────────────────────────────────────
+// Load fundamentals one by one slowly — no crash
+let oppsLoading = false;
 async function loadOpps() {
-  // Fetch fundamentals for all tickers that dont have them yet, in parallel batches
-  const missing = ALL_TICKERS.filter(t => !funds[t]);
-  for (let i = 0; i < missing.length; i += 10) {
-    const batch = missing.slice(i, i + 10);
-    await Promise.all(batch.map(t => fetchFundamentals(t)));
-    renderOpps(); // re-render after each batch
+  if (oppsLoading) return;
+  oppsLoading = true;
+  const missing = ALL_TICKERS.filter(t => !funds[t] && prices[t]?.price);
+  for (const ticker of missing) {
+    await fetchFundamentals(ticker);
+    await new Promise(r => setTimeout(r, 300)); // 300ms between each
+    if (currentView === 'opps') renderOpps();
   }
+  oppsLoading = false;
 }
 
 function renderOpps() {
@@ -1320,9 +1324,13 @@ function renderOpps() {
     .sort((a,b) => b.upside - a.upside)
     .slice(0, 24);
 
+  const hasAny = ALL_TICKERS.some(t => funds[t]);
+  if (!top.length && !hasAny) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div>Loading fundamentals... please wait</div>';
+    return;
+  }
   if (!top.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div>Loading fundamentals data — this may take ~30 seconds on first load...</div>';
-    loadOpps();
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div>No opportunities found with current data</div>';
     return;
   }
 
