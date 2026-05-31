@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>US Market Live — S&P 500</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Variables ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #080b0f;
+  --bg2:       #0d1117;
+  --bg3:       #141c26;
+  --border:    #1e2d3d;
+  --border2:   #253447;
+  --text:      #e2e8f0;
+  --muted:     #64748b;
+  --accent:    #00d4ff;
+  --accent2:   #0099cc;
+  --green:     #22c55e;
+  --green-dim: #166534;
+  --red:       #ef4444;
+  --red-dim:   #7f1d1d;
+  --gold:      #f59e0b;
+  --mono:      'DM Mono', monospace;
+  --sans:      'Syne', sans-serif;
+  --body:      'Inter', sans-serif;
+  --radius:    8px;
+  --shadow:    0 4px 24px rgba(0,0,0,.5);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── Ticker Tape ───────────────────────────────────────────────────────── */
+#tape-wrap {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  height: 36px;
+  overflow: hidden;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+#tape {
+  display: flex;
+  gap: 0;
+  white-space: nowrap;
+  animation: scroll-left 120s linear infinite;
+  height: 100%;
+  align-items: center;
+}
+#tape:hover { animation-play-state: paused; }
+.tape-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 20px;
+  border-right: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  height: 100%;
+}
+.tape-item .t-sym { color: var(--text); font-weight: 500; font-size: 11px; }
+.tape-item .t-price { color: var(--text); }
+.tape-item .t-chg.up { color: var(--green); }
+.tape-item .t-chg.dn { color: var(--red); }
+@keyframes scroll-left {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.logo-text {
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+.logo-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  background: var(--accent);
+  color: #000;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.market-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+.status-dot.closed { background: var(--red); box-shadow: 0 0 6px var(--red); animation: none; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+.header-stats {
+  display: flex;
+  gap: 24px;
+}
+.hstat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.hstat-label { font-size: 10px; color: var(--muted); font-family: var(--mono); letter-spacing: .5px; }
+.hstat-val   { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+.hstat-val.up  { color: var(--green); }
+.hstat-val.dn  { color: var(--red); }
+
+#last-update {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ── Main layout ───────────────────────────────────────────────────────── */
+.main { display: flex; height: calc(100vh - 109px); overflow: hidden; }
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.sidebar-section { padding: 14px 16px 10px; }
+.sidebar-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.sector-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .15s;
+  margin-bottom: 2px;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+}
+.sector-btn:hover { background: var(--bg3); }
+.sector-btn.active { background: var(--bg3); border: 1px solid var(--border2); }
+.sector-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sector-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.sector-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.sector-perf {
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+/* ── Content ───────────────────────────────────────────────────────────── */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Toolbar ───────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  flex-wrap: wrap;
+}
+.search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 300px;
+}
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+#search-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px 7px 32px;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 12px;
+  outline: none;
+  transition: border-color .15s;
+}
+#search-input:focus { border-color: var(--accent); }
+#search-input::placeholder { color: var(--muted); }
+
+.tab-group {
+  display: flex;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.tab-btn {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.tab-btn.active { background: var(--accent); color: #000; font-weight: 500; }
+.tab-btn:hover:not(.active) { color: var(--text); }
+
+.filter-select {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+.filter-select:focus { border-color: var(--accent); }
+
+.ai-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #1a2744, #0d1b2e);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .2s;
+  letter-spacing: .5px;
+}
+.ai-btn:hover { background: var(--accent); color: #000; }
+.ai-btn svg { width: 13px; height: 13px; }
+
+/* ── Views ─────────────────────────────────────────────────────────────── */
+.view { flex: 1; overflow-y: auto; display: none; }
+.view.active { display: block; }
+
+/* ── Table View ────────────────────────────────────────────────────────── */
+.table-container { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+thead { position: sticky; top: 0; z-index: 10; }
+th {
+  background: var(--bg3);
+  border-bottom: 2px solid var(--border);
+  padding: 10px 14px;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: color .15s;
+}
+th:hover { color: var(--text); }
+th.sort-asc::after  { content: " ▲"; color: var(--accent); }
+th.sort-desc::after { content: " ▼"; color: var(--accent); }
+th.num { text-align: right; }
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+  cursor: pointer;
+}
+tbody tr:hover { background: var(--bg3); }
+
+td {
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+td.num { text-align: right; font-family: var(--mono); font-size: 12px; }
+
+.stock-name-cell { display: flex; align-items: center; gap: 10px; }
+.stock-icon {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.stock-sym  { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--text); }
+.stock-full { font-size: 11px; color: var(--muted); margin-top: 1px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+
+.price-cell { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+.chg-cell   { font-family: var(--mono); font-size: 12px; }
+.up { color: var(--green); }
+.dn { color: var(--red); }
+.neu { color: var(--muted); }
+
+.signal-pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-family: var(--mono);
+  font-weight: 500;
+  letter-spacing: .3px;
+  white-space: nowrap;
+}
+.pill-sb  { background: rgba(34,197,94,.15); color: #4ade80; border: 1px solid rgba(34,197,94,.3); }
+.pill-b   { background: rgba(34,197,94,.08); color: #86efac; border: 1px solid rgba(34,197,94,.2); }
+.pill-h   { background: rgba(100,116,139,.12); color: var(--muted); border: 1px solid var(--border); }
+.pill-s   { background: rgba(239,68,68,.08); color: #fca5a5; border: 1px solid rgba(239,68,68,.2); }
+.pill-ss  { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.3); }
+
+.bar-wrap { display: flex; align-items: center; gap: 6px; }
+.bar-bg {
+  width: 60px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.bar-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+
+.vol-cell { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.mktcap-cell { font-family: var(--mono); font-size: 11px; }
+
+/* ── Heatmap View ──────────────────────────────────────────────────────── */
+#heatmap-view { padding: 20px; }
+.heatmap-sector { margin-bottom: 28px; }
+.heatmap-sector-title {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 10px;
+  letter-spacing: .5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.heatmap-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.heatmap-cell {
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform .15s, filter .15s;
+  overflow: hidden;
+  padding: 6px 4px;
+  min-width: 60px;
+  min-height: 50px;
+}
+.heatmap-cell:hover { transform: scale(1.04); filter: brightness(1.2); z-index: 2; }
+.hm-sym  { font-family: var(--mono); font-size: 11px; font-weight: 500; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.hm-chg  { font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,.85); text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+
+/* ── Sectors View ──────────────────────────────────────────────────────── */
+#sectors-view { padding: 20px; }
+.sectors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.sector-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: border-color .2s, transform .2s;
+}
+.sector-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+.sc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sc-name { display: flex; align-items: center; gap: 10px; }
+.sc-dot  { width: 12px; height: 12px; border-radius: 50%; }
+.sc-title { font-family: var(--sans); font-size: 15px; font-weight: 700; }
+.sc-perf { font-family: var(--mono); font-size: 16px; font-weight: 500; }
+.sc-bar-bg {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.sc-bar-fill { height: 100%; border-radius: 2px; }
+.sc-stats { display: flex; gap: 20px; }
+.sc-stat { display: flex; flex-direction: column; }
+.sc-stat-label { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.sc-stat-val   { font-family: var(--mono); font-size: 13px; margin-top: 2px; }
+
+/* ── Top Opportunities ─────────────────────────────────────────────────── */
+#opps-view { padding: 20px; }
+.opps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+.opp-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color .2s, transform .2s;
+  position: relative;
+  overflow: hidden;
+}
+.opp-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+.opp-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.opp-rank {
+  position: absolute;
+  top: 12px; right: 14px;
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--border2);
+}
+.opp-sym   { font-family: var(--mono); font-size: 18px; font-weight: 500; margin-bottom: 2px; }
+.opp-name  { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+.opp-price { font-family: var(--mono); font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+.opp-stats { display: flex; flex-direction: column; gap: 4px; }
+.opp-stat  { display: flex; justify-content: space-between; font-size: 11px; }
+.opp-stat-label { color: var(--muted); }
+.opp-stat-val   { font-family: var(--mono); }
+.opp-upside { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--green); }
+
+/* ── Earnings Panel ────────────────────────────────────────────────────── */
+#earnings-view { padding: 20px; }
+.earnings-list { display: flex; flex-direction: column; gap: 8px; max-width: 700px; }
+.earning-row {
+  display: flex;
+  align-items: center;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  gap: 16px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.earning-row:hover { border-color: var(--border2); }
+.er-date  { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 80px; flex-shrink: 0; }
+.er-days  { font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 4px; background: var(--bg3); color: var(--accent); flex-shrink: 0; }
+.er-sym   { font-family: var(--mono); font-size: 13px; font-weight: 500; width: 70px; }
+.er-name  { font-size: 12px; color: var(--muted); flex: 1; }
+.er-eps   { font-family: var(--mono); font-size: 12px; text-align: right; }
+
+/* ── AI Modal ──────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.6);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title { font-family: var(--sans); font-size: 16px; font-weight: 700; }
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+  transition: color .15s;
+}
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 20px 24px; flex: 1; overflow-y: auto; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+
+.ai-provider-select {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  outline: none;
+}
+.send-btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity .15s;
+  margin-left: auto;
+}
+.send-btn:hover { opacity: .85; }
+.send-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+#ai-prompt {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 13px;
+  resize: vertical;
+  min-height: 120px;
+  outline: none;
+  transition: border-color .15s;
+}
+#ai-prompt:focus { border-color: var(--accent); }
+
+.ai-result {
+  margin-top: 16px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  display: none;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.ai-result.visible { display: block; }
+.ai-spinner {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  margin-top: 12px;
+}
+.ai-spinner.visible { display: flex; }
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Loading overlay ───────────────────────────────────────────────────── */
+#loading {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 9999;
+  transition: opacity .5s;
+}
+#loading.fade { opacity: 0; pointer-events: none; }
+.loading-logo { font-family: var(--sans); font-size: 32px; font-weight: 800; }
+.loading-logo span { color: var(--accent); }
+.loading-bar-bg {
+  width: 200px; height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.loading-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 1px;
+  animation: load-fill 2.5s ease-in-out forwards;
+}
+@keyframes load-fill { 0%{width:0} 70%{width:80%} 100%{width:100%} }
+.loading-text { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+/* ── Empty state ───────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  gap: 8px;
+}
+.empty-icon { font-size: 32px; margin-bottom: 8px; }
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .header-stats { display: none; }
+  .hstat { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="loading-logo">US<span>Market</span></div>
+  <div class="loading-bar-bg"><div class="loading-bar"></div></div>
+  <div class="loading-text">Connecting to market data...</div>
+</div>
+
+<!-- Ticker Tape -->
+<div id="tape-wrap"><div id="tape"></div></div>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-text">USMarket<span style="color:var(--accent)">Live</span></div>
+    <div class="logo-badge">S&P 500</div>
+  </div>
+  <div class="header-meta">
+    <div class="market-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Connecting...</span>
+    </div>
+    <div class="header-stats">
+      <div class="hstat">
+        <span class="hstat-label">ADVANCING</span>
+        <span class="hstat-val up" id="h-adv">—</span>
+      </div>
+      <div class="hstat">
+        <span class="hstat-label">DECLINING</span>
+        <span class="hstat-val dn" id="h-dec">—</span>
+      </div>
+      <div class="hstat">
+        <span class="hstat-label">AVG CHG</span>
+        <span class="hstat-val" id="h-avg">—</span>
+      </div>
+    </div>
+    <div id="last-update">—</div>
+  </div>
+</header>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Sectors</div>
+      <button class="sector-btn active" data-sector="ALL" onclick="filterSector('ALL',this)">
+        <span class="sector-name">
+          <span class="sector-dot" style="background:#64748b"></span>All Sectors
+        </span>
+        <span class="sector-count" id="sc-ALL">—</span>
+      </button>
+      <!-- Sector buttons injected by JS -->
+      <div id="sector-list"></div>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Search ticker or name..." oninput="applyFilters()">
+      </div>
+
+      <div class="tab-group">
+        <button class="tab-btn active" onclick="switchView('table',this)">Table</button>
+        <button class="tab-btn" onclick="switchView('heatmap',this)">Heatmap</button>
+        <button class="tab-btn" onclick="switchView('sectors',this)">Sectors</button>
+        <button class="tab-btn" onclick="switchView('opps',this)">Opportunities</button>
+        <button class="tab-btn" onclick="switchView('earnings',this)">Earnings</button>
+      </div>
+
+      <select class="filter-select" id="signal-filter" onchange="applyFilters()">
+        <option value="">All Signals</option>
+        <option value="Strong Buy">Strong Buy</option>
+        <option value="Buy">Buy</option>
+        <option value="Hold">Hold</option>
+        <option value="Sell">Sell</option>
+        <option value="Strong Sell">Strong Sell</option>
+      </select>
+
+      <select class="filter-select" id="sort-select" onchange="applyFilters()">
+        <option value="sym">Symbol</option>
+        <option value="price">Price</option>
+        <option value="chgPct" selected>% Change</option>
+        <option value="upside">Upside</option>
+        <option value="marketCap">Market Cap</option>
+        <option value="volume">Volume</option>
+      </select>
+
+      <button class="ai-btn" onclick="openAI()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+        AI Analysis
+      </button>
+    </div>
+
+    <!-- Views -->
+    <div id="table-view" class="view active">
+      <div class="table-container">
+        <table id="stocks-table">
+          <thead>
+            <tr>
+              <th onclick="sortBy('sym')">Symbol</th>
+              <th class="num" onclick="sortBy('price')">Price</th>
+              <th class="num" onclick="sortBy('chg')">Change</th>
+              <th class="num" onclick="sortBy('chgPct')">% Change</th>
+              <th onclick="sortBy('signal')">Signal</th>
+              <th class="num" onclick="sortBy('upside')">Upside</th>
+              <th>52W Range</th>
+              <th class="num" onclick="sortBy('marketCap')">Mkt Cap</th>
+              <th class="num" onclick="sortBy('pe')">P/E</th>
+              <th class="num" onclick="sortBy('volume')">Volume</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="heatmap-view" class="view"></div>
+    <div id="sectors-view" class="view"></div>
+    <div id="opps-view"    class="view"></div>
+    <div id="earnings-view" class="view"></div>
+
+  </div>
+</div>
+
+<!-- AI Modal -->
+<div class="modal-overlay" id="ai-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🤖 AI Market Analysis</div>
+      <button class="modal-close" onclick="closeAI()">×</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="ai-prompt" placeholder="Ask about market conditions, sector trends, top opportunities..."></textarea>
+      <div class="ai-spinner" id="ai-spinner"><div class="spinner"></div> Analyzing market data...</div>
+      <div class="ai-result" id="ai-result"></div>
+    </div>
+    <div class="modal-footer">
+      <select class="ai-provider-select" id="ai-provider">
+        <option value="auto">Auto (Best Available)</option>
+        <option value="groq">Groq — Llama 3.3 70B</option>
+        <option value="gemini">Gemini 2.5 Flash</option>
+        <option value="openrouter">OpenRouter — Qwen3</option>
+      </select>
+      <button class="send-btn" id="send-btn" onclick="runAI()">Analyze ↗</button>
+    </div>
+  </div>
+</div>
+
+<!-- Data -->
+<script src="data.js"></script>
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+const API_BASE = window.location.origin;
+const REFRESH_MS = 10000;
+
+// ── State ───────────────────────────────────────────────────────────────────
+let prices     = {};
+let funds      = {};
+let earnings   = {};
+let activeSector = 'ALL';
+let currentView  = 'table';
+let sortKey      = 'chgPct';
+let sortDir      = -1;  // -1 = desc
+let tapeInit     = false;
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const fmt = {
+  price:  v => v != null ? '$' + Number(v).toFixed(2) : '—',
+  chg:    v => v != null ? (v >= 0 ? '+' : '') + Number(v).toFixed(2) : '—',
+  pct:    v => v != null ? (v >= 0 ? '+' : '') + Number(v).toFixed(2) + '%' : '—',
+  upside: v => v != null ? (v >= 0 ? '+' : '') + Number(v).toFixed(1) + '%' : '—',
+  vol:    v => {
+    if (v == null) return '—';
+    if (v >= 1e9) return (v/1e9).toFixed(1) + 'B';
+    if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return (v/1e3).toFixed(0) + 'K';
+    return v;
+  },
+  mcap:   v => {
+    if (v == null) return '—';
+    if (v >= 1e12) return '$' + (v/1e12).toFixed(2) + 'T';
+    if (v >= 1e9)  return '$' + (v/1e9).toFixed(1) + 'B';
+    if (v >= 1e6)  return '$' + (v/1e6).toFixed(0) + 'M';
+    return '$' + v;
+  },
+  pe:     v => v != null ? Number(v).toFixed(1) + 'x' : '—',
+};
+
+function signalPill(sig) {
+  const map = {
+    'Strong Buy':  ['pill-sb','Strong Buy'],
+    'Buy':         ['pill-b', 'Buy'],
+    'Hold':        ['pill-h', 'Hold'],
+    'Sell':        ['pill-s', 'Sell'],
+    'Strong Sell': ['pill-ss','Strong Sell'],
+  };
+  const [cls, label] = map[sig] || ['pill-h','—'];
+  return `<span class="signal-pill ${cls}">${label}</span>`;
+}
+
+function signalOrder(sig) {
+  return { 'Strong Buy':0,'Buy':1,'Hold':2,'Sell':3,'Strong Sell':4 }[sig] ?? 2;
+}
+
+function heatColor(pct) {
+  if (pct == null) return '#1e2d3d';
+  const v = Math.max(-5, Math.min(5, pct));
+  if (v > 0) {
+    const t = v / 5;
+    return `rgba(34,197,94,${0.15 + t * 0.55})`;
+  } else {
+    const t = -v / 5;
+    return `rgba(239,68,68,${0.15 + t * 0.55})`;
+  }
+}
+
+function isMarketOpen() {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  const h = et.getHours(), m = et.getMinutes();
+  const mins = h * 60 + m;
+  return day >= 1 && day <= 5 && mins >= 570 && mins < 960; // 9:30–16:00 ET
+}
+
+function enrichStock(ticker) {
+  const p = prices[ticker]  || {};
+  const f = funds[ticker]   || {};
+  const s = STOCKS[ticker]  || {};
+  const price    = p.price;
+  const upside   = (f.target && price) ? ((f.target - price) / price * 100) : null;
+  const signal   = calcSignal(ticker, price, p, f);
+  return { ticker, ...s, ...p, ...f, price, upside, signal };
+}
+
+function calcSignal(ticker, price, p, f) {
+  if (!price) return '—';
+  const high52 = p.high52 || 0;
+  const low52  = p.low52  || 0;
+  const target = f.target  || 0;
+  const rec    = f.recommendation || 'hold';
+  if (!high52 || !low52) return '—';
+
+  const pct52  = (price - low52) / (high52 - low52);
+  const upside = target > 0 ? (target - price) / price : 0;
+  const recScore = { strong_buy:2, buy:1, hold:0, sell:-1, strong_sell:-2 }[rec] ?? 0;
+  const score = (1 - pct52) * 40 + upside * 40 + recScore * 10;
+
+  if (score >= 50) return 'Strong Buy';
+  if (score >= 20) return 'Buy';
+  if (score >= -10) return 'Hold';
+  if (score >= -30) return 'Sell';
+  return 'Strong Sell';
+}
+
+function range52Bar(price, low52, high52) {
+  if (!price || !low52 || !high52 || high52 === low52) return '';
+  const pct = Math.min(100, Math.max(0, (price - low52) / (high52 - low52) * 100));
+  const color = pct < 33 ? 'var(--red)' : pct < 67 ? 'var(--gold)' : 'var(--green)';
+  return `
+    <div class="bar-wrap">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted);width:28px">${pct.toFixed(0)}%</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+}
+
+// ── Fetch data ───────────────────────────────────────────────────────────────
+async function fetchPrices() {
+  try {
+    const res  = await fetch(`${API_BASE}/api/prices`);
+    const data = await res.json();
+    // data = { AAPL: { price, chg, chgPct, ... }, ... }
+    prices = {};
+    for (const [k, v] of Object.entries(data)) prices[k] = v;
+    updateHeader();
+    renderCurrentView();
+    updateTape();
+    document.getElementById('last-update').textContent =
+      'Updated ' + new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  } catch(e) {
+    console.error('Price fetch error:', e);
+  }
+}
+
+async function fetchFundamentals(ticker) {
+  if (funds[ticker]) return;
+  try {
+    const res  = await fetch(`${API_BASE}/api/fundamentals/${ticker}`);
+    funds[ticker] = await res.json();
+  } catch(e) {}
+}
+
+async function fetchEarnings() {
+  try {
+    const res  = await fetch(`${API_BASE}/api/earnings`);
+    const data = await res.json();
+    earnings   = data.upcoming || [];
+    if (currentView === 'earnings') renderEarnings();
+  } catch(e) {}
+}
+
+// ── Ticker Tape ──────────────────────────────────────────────────────────────
+function updateTape() {
+  const tickers = ALL_TICKERS.filter(t => prices[t]?.price).slice(0, 80);
+  const html = tickers.map(t => {
+    const p = prices[t];
+    const up = (p.chgPct || 0) >= 0;
+    return `<div class="tape-item">
+      <span class="t-sym">${t}</span>
+      <span class="t-price">${fmt.price(p.price)}</span>
+      <span class="t-chg ${up?'up':'dn'}">${fmt.pct(p.chgPct)}</span>
+    </div>`;
+  }).join('');
+
+  const tape = document.getElementById('tape');
+  tape.innerHTML = html + html; // duplicate for seamless loop
+}
+
+// ── Header stats ─────────────────────────────────────────────────────────────
+function updateHeader() {
+  const vals = ALL_TICKERS.map(t => prices[t]?.chgPct).filter(v => v != null);
+  const adv  = vals.filter(v => v > 0).length;
+  const dec  = vals.filter(v => v < 0).length;
+  const avg  = vals.length ? vals.reduce((a,b) => a+b, 0) / vals.length : 0;
+
+  document.getElementById('h-adv').textContent = adv;
+  document.getElementById('h-dec').textContent = dec;
+  const avgEl = document.getElementById('h-avg');
+  avgEl.textContent  = fmt.pct(avg);
+  avgEl.className    = 'hstat-val ' + (avg >= 0 ? 'up' : 'dn');
+
+  const open = isMarketOpen();
+  document.getElementById('status-dot').className = 'status-dot' + (open ? '' : ' closed');
+  document.getElementById('status-text').textContent = open ? 'Market Open' : 'Market Closed';
+}
+
+// ── Sector sidebar ───────────────────────────────────────────────────────────
+function buildSidebar() {
+  const container = document.getElementById('sector-list');
+  container.innerHTML = SECTORS.map(s => `
+    <button class="sector-btn" data-sector="${s.name}" onclick="filterSector('${s.name}',this)">
+      <span class="sector-name">
+        <span class="sector-dot" style="background:${s.color}"></span>
+        <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis">${s.name}</span>
+      </span>
+      <span class="sector-count">${s.count}</span>
+    </button>`).join('');
+}
+
+function filterSector(sector, btn) {
+  activeSector = sector;
+  document.querySelectorAll('.sector-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+// ── Filters & Sort ───────────────────────────────────────────────────────────
+function getFiltered() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const sig    = document.getElementById('signal-filter').value;
+
+  return ALL_TICKERS
+    .filter(t => {
+      const s = STOCKS[t];
+      if (!s) return false;
+      if (activeSector !== 'ALL' && s.sector !== activeSector) return false;
+      if (search && !t.toLowerCase().includes(search) && !s.nameEn.toLowerCase().includes(search)) return false;
+      if (sig) {
+        const st = enrichStock(t);
+        if (st.signal !== sig) return false;
+      }
+      return true;
+    })
+    .map(t => enrichStock(t))
+    .sort((a, b) => {
+      const aVal = a[sortKey] ?? (sortDir > 0 ? Infinity : -Infinity);
+      const bVal = b[sortKey] ?? (sortDir > 0 ? Infinity : -Infinity);
+      if (sortKey === 'sym') return sortDir * a.ticker.localeCompare(b.ticker);
+      if (sortKey === 'signal') return sortDir * (signalOrder(a.signal) - signalOrder(b.signal));
+      return sortDir * ((bVal - aVal) || 0);
+    });
+}
+
+function sortBy(key) {
+  if (sortKey === key) { sortDir *= -1; }
+  else { sortKey = key; sortDir = -1; }
+  applyFilters();
+}
+
+function applyFilters() {
+  renderCurrentView();
+}
+
+// ── Render dispatchers ───────────────────────────────────────────────────────
+function switchView(view, btn) {
+  currentView = view;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(view + '-view').classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  if (currentView === 'table')    renderTable();
+  if (currentView === 'heatmap')  renderHeatmap();
+  if (currentView === 'sectors')  renderSectors();
+  if (currentView === 'opps')     renderOpps();
+  if (currentView === 'earnings') renderEarnings();
+}
+
+// ── Table render ─────────────────────────────────────────────────────────────
+function renderTable() {
+  const rows  = getFiltered();
+  const tbody = document.getElementById('table-body');
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="10">
+      <div class="empty-state"><div class="empty-icon">📭</div>No stocks match your filter</div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(s => {
+    const up = (s.chgPct || 0) >= 0;
+    return `<tr onclick="goStock('${s.ticker}')">
+      <td>
+        <div class="stock-name-cell">
+          <div class="stock-icon" style="background:${s.color}22;border:1px solid ${s.color}44">${s.icon || '📊'}</div>
+          <div>
+            <div class="stock-sym">${s.ticker}</div>
+            <div class="stock-full">${s.nameEn || ''}</div>
+          </div>
+        </div>
+      </td>
+      <td class="num price-cell">${fmt.price(s.price)}</td>
+      <td class="num chg-cell ${up?'up':'dn'}">${fmt.chg(s.chg)}</td>
+      <td class="num chg-cell ${up?'up':'dn'}">${fmt.pct(s.chgPct)}</td>
+      <td>${signalPill(s.signal)}</td>
+      <td class="num ${s.upside>0?'up':s.upside<0?'dn':'neu'}">${fmt.upside(s.upside)}</td>
+      <td>${range52Bar(s.price, s.low52, s.high52)}</td>
+      <td class="mktcap-cell num">${fmt.mcap(s.marketCap)}</td>
+      <td class="num" style="color:var(--muted)">${fmt.pe(s.pe)}</td>
+      <td class="vol-cell num">${fmt.vol(s.volume)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Heatmap render ───────────────────────────────────────────────────────────
+function renderHeatmap() {
+  const el = document.getElementById('heatmap-view');
+  const sectorFilter = activeSector === 'ALL' ? null : activeSector;
+  const search = document.getElementById('search-input').value.toLowerCase();
+
+  const sectorsToShow = sectorFilter
+    ? [{ name: sectorFilter, color: SECTOR_COLORS[sectorFilter] }]
+    : SECTORS;
+
+  el.innerHTML = sectorsToShow.map(sec => {
+    const tickers = (TICKERS_BY_SECTOR[sec.name] || [])
+      .filter(t => !search || t.toLowerCase().includes(search) || (STOCKS[t]?.nameEn||'').toLowerCase().includes(search));
+    if (!tickers.length) return '';
+
+    const cells = tickers.map(t => {
+      const p = prices[t] || {};
+      const pct = p.chgPct;
+      const bg  = heatColor(pct);
+      // Size by market cap (rough)
+      const f   = funds[t] || {};
+      const mc  = f.marketCap || 1e9;
+      const w   = Math.max(60, Math.min(160, Math.log10(mc / 1e8) * 30));
+      const h   = Math.max(50, Math.min(100, Math.log10(mc / 1e8) * 20));
+
+      return `<div class="heatmap-cell" style="background:${bg};width:${w}px;height:${h}px" onclick="goStock('${t}')" title="${STOCKS[t]?.nameEn}">
+        <span class="hm-sym">${t}</span>
+        <span class="hm-chg">${fmt.pct(pct)}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="heatmap-sector">
+      <div class="heatmap-sector-title">
+        <span style="width:10px;height:10px;border-radius:50%;background:${sec.color};display:inline-block"></span>
+        ${sec.name}
+      </div>
+      <div class="heatmap-grid">${cells}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Sectors render ───────────────────────────────────────────────────────────
+function renderSectors() {
+  const el = document.getElementById('sectors-view');
+
+  const sectorData = SECTORS.map(sec => {
+    const tickers = TICKERS_BY_SECTOR[sec.name] || [];
+    const changes = tickers.map(t => prices[t]?.chgPct).filter(v => v != null);
+    const avg     = changes.length ? changes.reduce((a,b)=>a+b,0)/changes.length : null;
+    const adv     = changes.filter(v=>v>0).length;
+    const dec     = changes.filter(v=>v<0).length;
+    return { ...sec, avg, adv, dec, count: tickers.length };
+  }).sort((a,b) => (b.avg||0) - (a.avg||0));
+
+  el.innerHTML = `<div class="sectors-grid">` + sectorData.map(s => {
+    const up  = (s.avg || 0) >= 0;
+    const barW = s.avg != null ? Math.min(100, Math.abs(s.avg) * 20) : 0;
+    return `<div class="sector-card" onclick="filterSector('${s.name}',document.querySelector('[data-sector=\\'${s.name}\\']'))||switchView('table',document.querySelectorAll('.tab-btn')[0])">
+      <div class="sc-top">
+        <div class="sc-name">
+          <div class="sc-dot" style="background:${s.color}"></div>
+          <div class="sc-title">${s.name}</div>
+        </div>
+        <div class="sc-perf ${up?'up':'dn'}">${s.avg != null ? fmt.pct(s.avg) : '—'}</div>
+      </div>
+      <div class="sc-bar-bg">
+        <div class="sc-bar-fill" style="width:${barW}%;background:${up?'var(--green)':'var(--red)'}"></div>
+      </div>
+      <div class="sc-stats">
+        <div class="sc-stat">
+          <span class="sc-stat-label">STOCKS</span>
+          <span class="sc-stat-val">${s.count}</span>
+        </div>
+        <div class="sc-stat">
+          <span class="sc-stat-label">ADVANCING</span>
+          <span class="sc-stat-val up">${s.adv}</span>
+        </div>
+        <div class="sc-stat">
+          <span class="sc-stat-label">DECLINING</span>
+          <span class="sc-stat-val dn">${s.dec}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// ── Opportunities render ─────────────────────────────────────────────────────
+function renderOpps() {
+  const el  = document.getElementById('opps-view');
+  const top = ALL_TICKERS
+    .map(t => enrichStock(t))
+    .filter(s => s.price && s.upside != null && s.upside > 0)
+    .sort((a,b) => b.upside - a.upside)
+    .slice(0, 24);
+
+  if (!top.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div>Loading data...</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="padding:20px 20px 10px;font-family:var(--sans);font-size:13px;color:var(--muted)">
+      Top ${top.length} stocks by analyst upside potential
+    </div>
+    <div class="opps-grid" style="padding:0 20px 20px">` +
+    top.map((s, i) => `
+      <div class="opp-card" onclick="goStock('${s.ticker}')" style="border-top:2px solid ${s.color}">
+        <div class="opp-rank">#${i+1}</div>
+        <div class="opp-sym" style="color:${s.color}">${s.ticker}</div>
+        <div class="opp-name">${s.nameEn}</div>
+        <div class="opp-price">${fmt.price(s.price)}</div>
+        <div class="opp-stats">
+          <div class="opp-stat">
+            <span class="opp-stat-label">Target</span>
+            <span class="opp-stat-val">${fmt.price(s.target)}</span>
+          </div>
+          <div class="opp-stat">
+            <span class="opp-stat-label">Upside</span>
+            <span class="opp-upside">+${Number(s.upside).toFixed(1)}%</span>
+          </div>
+          <div class="opp-stat">
+            <span class="opp-stat-label">Signal</span>
+            <span class="opp-stat-val">${signalPill(s.signal)}</span>
+          </div>
+          <div class="opp-stat">
+            <span class="opp-stat-label">P/E</span>
+            <span class="opp-stat-val">${fmt.pe(s.pe)}</span>
+          </div>
+        </div>
+      </div>`).join('') + '</div>';
+}
+
+// ── Earnings render ──────────────────────────────────────────────────────────
+function renderEarnings() {
+  const el = document.getElementById('earnings-view');
+
+  if (!earnings.length) {
+    fetchEarnings();
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div>Loading earnings calendar...</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="padding:20px 20px 12px;font-family:var(--sans);font-size:13px;color:var(--muted)">
+      Upcoming earnings — next 30 days
+    </div>
+    <div class="earnings-list" style="padding:0 20px 20px">` +
+    earnings.map(e => {
+      const s = STOCKS[e.ticker] || {};
+      return `<div class="earning-row" onclick="goStock('${e.ticker}')">
+        <span class="er-date">${e.nextEarningsDate || '—'}</span>
+        <span class="er-days">${e.daysAway === 0 ? 'Today' : e.daysAway === 1 ? 'Tomorrow' : `${e.daysAway}d`}</span>
+        <span class="er-sym">${e.ticker}</span>
+        <span class="er-name">${s.nameEn || ''}</span>
+        <span class="er-eps ${(e.epsEstimate||0)>0?'up':'dn'}">EPS est. ${e.epsEstimate != null ? '$'+Number(e.epsEstimate).toFixed(2) : '—'}</span>
+      </div>`;
+    }).join('') + '</div>';
+}
+
+// ── AI Modal ─────────────────────────────────────────────────────────────────
+function buildAIPrompt() {
+  const rows = getFiltered().slice(0, 20);
+  const market = (() => {
+    const vals = ALL_TICKERS.map(t => prices[t]?.chgPct).filter(v => v != null);
+    const avg  = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2) : '—';
+    const adv  = vals.filter(v=>v>0).length;
+    const dec  = vals.filter(v=>v<0).length;
+    return `Market: avg ${avg}%, ${adv} advancing / ${dec} declining out of ${vals.length} stocks`;
+  })();
+
+  return `You are an expert US equity market analyst.
+
+${market}
+
+Top stocks in current view:
+${rows.slice(0,10).map(s => `${s.ticker}: $${s.price?.toFixed(2)||'?'} (${fmt.pct(s.chgPct)}) | Signal: ${s.signal} | Upside: ${fmt.upside(s.upside)} | Sector: ${s.sector}`).join('\n')}
+
+Please provide a concise, professional market analysis covering:
+1. Overall market breadth and sentiment
+2. Sector rotation trends visible in the data
+3. Top 3 specific opportunities with reasoning
+4. Key risks to watch
+
+Be direct and actionable. Use plain English, no markdown headers.`;
+}
+
+function openAI() {
+  document.getElementById('ai-modal').classList.add('open');
+  document.getElementById('ai-prompt').value = buildAIPrompt();
+  document.getElementById('ai-result').classList.remove('visible');
+  document.getElementById('ai-result').textContent = '';
+}
+function closeAI() {
+  document.getElementById('ai-modal').classList.remove('open');
+}
+
+async function runAI() {
+  const prompt   = document.getElementById('ai-prompt').value.trim();
+  const provider = document.getElementById('ai-provider').value;
+  if (!prompt) return;
+
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  document.getElementById('ai-spinner').classList.add('visible');
+  document.getElementById('ai-result').classList.remove('visible');
+
+  try {
+    const res  = await fetch(`${API_BASE}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, prompt })
+    });
+    const data = await res.json();
+    const el   = document.getElementById('ai-result');
+    el.textContent = data.result || data.error || 'No response';
+    el.classList.add('visible');
+  } catch(e) {
+    const el = document.getElementById('ai-result');
+    el.textContent = 'Error: ' + e.message;
+    el.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('ai-spinner').classList.remove('visible');
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('ai-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeAI();
+});
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+function goStock(ticker) {
+  window.location.href = `stock.html?ticker=${ticker}`;
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  buildSidebar();
+  await fetchPrices();
+  fetchEarnings();
+
+  // Hide loading screen
+  setTimeout(() => {
+    document.getElementById('loading').classList.add('fade');
+    setTimeout(() => document.getElementById('loading').style.display = 'none', 500);
+  }, 800);
+
+  // Auto-refresh
+  setInterval(fetchPrices, REFRESH_MS);
+
+  // Lazy-load fundamentals for visible stocks
+  setInterval(() => {
+    const visible = getFiltered().slice(0, 30).map(s => s.ticker);
+    visible.forEach(t => fetchFundamentals(t));
+  }, 5000);
+}
+
+init();
+</script>
+</body>
+</html>
